@@ -1,0 +1,145 @@
+// Get screen dimensions
+screen.w = Window.GetWidth(0);
+screen.h = Window.GetHeight(0);
+screen.half.w = screen.w / 2;
+screen.half.h = screen.h / 2;
+
+// Set a solid black background (top and bottom)
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+// Background image scaled to full screen
+bg = Sprite(Image("bg.png").Scale(screen.w, screen.h));
+bg.SetZ(-10); // Send to back layer
+
+// Centered logo (gos-logo.png), scaled to 260x260 pixels
+logo_image = Image("gos-logo.png").Scale(260, 260);
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetX(screen.half.w - logo_image.GetWidth() / 2);
+logo_sprite.SetY(screen.half.h - logo_image.GetHeight() / 1.8); // Positioned slightly above center
+
+// Animated gos-head icon at the bottom center of the screen
+goshead_image = Image("gos-head-grey.png").Scale(150, 150); // Resize to 150x150
+goshead_sprite = Sprite(goshead_image);
+goshead_sprite.SetX(screen.half.w - 75); // Center horizontally
+goshead_sprite.SetY(screen.h - 150 - 30); // 30px above the bottom edge
+
+// Variables to handle blinking animation of gos-head
+goshead_sprite_opacity = 1.0;
+goshead_fade_dir = -1;
+
+// Draw static gray progress bar container (background)
+bar_width = 280;
+bar_height = 10;
+bar_x = screen.half.w - bar_width / 2;
+bar_y = screen.h * 0.7;
+
+bar_bg_image = Image.Create(bar_width, bar_height);
+bar_bg_image.Fill(0.3, 0.3, 0.3); // Fill with dark gray
+bar_bg_sprite = Sprite(bar_bg_image);
+bar_bg_sprite.SetX(bar_x);
+bar_bg_sprite.SetY(bar_y);
+
+// Moving progress bar element (pb.png)
+pb_line_image = Image("pb.png");
+pb_line_sprite = Sprite(pb_line_image);
+pb_line_width = pb_line_image.GetWidth();
+pb_line_sprite.SetY(bar_y);
+pb_line_sprite.SetX(bar_x); // Initial position at left edge of progress bar
+
+// Text and prompt display setup
+message = null;
+prompt = null;
+response = null;
+
+// Calculate height of a typical text line (used for layout)
+text_line_height = Image.Text("Dummy text abcxyz").GetHeight();
+prompt_y = screen.h * 0.75;
+response_y = prompt_y + text_line_height * 2;
+message_y = prompt_y + text_line_height * 4;
+
+// Internal counter (used for animation timing)
+time_counter = 0.0;
+
+// Utility: wrap image into a splash sprite object (not used but kept for reuse)
+fun make_splash_sprite_from_image(img) {
+    local.splash_sprite.image = img;
+    local.splash_sprite.sprite = make_splash_sprite_sprite(local.splash_sprite.image);
+    return local.splash_sprite;
+}
+
+// Variables for progress bar animation (ping-pong motion)
+pb_offset = 0;
+pb_direction = 1;
+
+// Refresh callback is called repeatedly during the splash screen
+fun refresh_callback() {
+    time_counter++;
+
+    // Fade-in / fade-out blinking animation for gos-head
+    goshead_sprite_opacity += goshead_fade_dir * 0.05;
+    if (goshead_sprite_opacity <= 0.2) {
+        goshead_fade_dir = 1;
+        goshead_sprite_opacity = 0.2;
+    } else if (goshead_sprite_opacity >= 1.0) {
+        goshead_fade_dir = -1;
+        goshead_sprite_opacity = 1.0;
+    }
+    goshead_sprite.SetOpacity(goshead_sprite_opacity);
+
+    // Move the pb.png (white progress bar line) left and right
+    pb_offset += pb_direction * 5;
+
+    // Bounce back when reaching the ends of the container
+    if (pb_offset <= 0 || pb_offset + pb_line_width >= bar_width) {
+        pb_direction *= -1;
+    }
+
+    pb_line_sprite.SetX(bar_x + pb_offset);
+}
+
+// Set function to show a prompt (e.g., for input)
+fun display_question_callback(prompt_text, entry) {
+    display_prompt(prompt_text);
+}
+Plymouth.SetDisplayQuestionFunction(display_question_callback);
+
+// Set function to handle password input prompts (with dots or placeholder)
+fun display_password_callback(prompt_text, dot_count) {
+    display_prompt(prompt_text);
+
+    response = null;
+    if (dot_count > 0) {
+        dot_start_position = screen.half.w - (dot_count * bullet.image.GetWidth()) / 2;
+        for (i = 0; i < dot_count; i++) {
+            response[i].sprite = Sprite(bullet.image);
+            response[i].sprite.SetX(dot_start_position + i * bullet.image.GetWidth());
+            response[i].sprite.SetY(response_y + (text_line_height - bullet.image.GetHeight()) / 2);
+        }
+    } else {
+        response.image = Image.Text("Enter passphrase", 1, 1, 1, 0.5);
+        response.sprite = Sprite(response.image);
+        response.sprite.SetX(screen.half.w - response.image.GetWidth() / 2);
+        response.sprite.SetY(response_y);
+    }
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+// Set function for returning to normal screen (reset)
+fun display_normal_callback() {
+    prompt = null;
+    message = null;
+    response = null;
+}
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+// Display system messages (e.g., “Starting service...”)
+fun message_callback(text) {
+    message.image = Image.Text(text, 1, 1, 1, 0.75, "Sans 10");
+    message.sprite = Sprite(message.image);
+    message.sprite.SetPosition(screen.half.w - message.image.GetWidth() / 2, message_y);
+}
+Plymouth.SetMessageFunction(message_callback);
+
+// Register refresh function for animation
+Plymouth.SetRefreshFunction(refresh_callback);

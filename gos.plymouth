@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=GOS
+Description=GOS - boot animation of GoS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/gos
+ScriptFile=/usr/share/plymouth/themes/gos/gos.script
